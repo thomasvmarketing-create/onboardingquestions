@@ -1,44 +1,54 @@
 # Onboarding Questions
 
-Client interview tools for Videos That Convert, built as Claude artifact pages.
+Client onboarding interview for Videos That Convert. Clients answer 17 questions by talking or typing, their answers save as they go, and you see every client's answers on a password-protected dashboard.
 
-## What's here
+Live site: https://onboardingquestions.vercel.app
 
-| File | What it is |
+## How it works
+
+- **Your dashboard:** `/admin`. Sign in with your password, add a client by name, and you get their personal link (copied automatically). The dashboard shows each client's progress, their full answers, and lets you copy or download them.
+- **Client link:** `/?c=<code>`. Each client gets their own link with no sign-in. They see only their own interview.
+- **Voice answers:** each question has a **Record your answer** button. The browser turns speech into text as they talk (Chrome, Edge and Safari, including iPhone and Android). The first time, the browser asks to use the microphone. In browsers without speech-to-text (such as Firefox), the page shows how to use keyboard dictation instead.
+- **Saving:** answers save to the server about a second after the client stops talking or typing, and on every Next/Back. If the server can't be reached, answers keep saving on the client's device and send once they reopen the link.
+
+## One-time setup in Vercel
+
+1. **Connect storage.** In the Vercel project, open **Storage**, choose **Create Database**, pick **Upstash for Redis** (the free plan is plenty), and connect it to this project. This adds the `KV_REST_API_URL` and `KV_REST_API_TOKEN` variables for you.
+2. **Set your password.** Open **Settings -> Environment Variables** and add `ADMIN_PASSWORD` with the password you want for the dashboard.
+3. **Redeploy.** In **Deployments**, open the menu on the latest deployment and choose **Redeploy**.
+
+Until both are set, `/admin` shows these steps instead of the dashboard.
+
+## Files
+
+| Path | What it is |
 | --- | --- |
-| `onboarding.html` | **Channel Onboarding Interview.** 17 onboarding questions, one per screen. Clients talk or type their answers; nothing responds to them. Answers save as they go. The owner sees a private dashboard of every client's responses. |
-| `Channel Onboarding Interview.html` | The same onboarding page as published (includes the page wrapper Claude adds at publish time). |
-| `script-interview.html` | **Script Interview.** A paged video brief plus a live Claude interviewer that asks one question at a time and turns the answers into a context pack for scripting. |
-| `skills/client-script-interview/SKILL.md` | The Claude skill behind the script interview, for use directly in Claude chats. |
-| `tests/onboarding.test.js` | End-to-end browser tests for the onboarding page. |
+| `index.html` | The client interview page. |
+| `admin.html` | Your dashboard. |
+| `assets/questions.js` | The 17 questions and their helper text. Edit wording here; keep the order, since answers are stored by position (`q01`...`q17`). |
+| `assets/style.css` | Shared styles. |
+| `api/client.js` | Loads and saves one client's answers, by their link code. |
+| `api/admin.js` | Dashboard API: list clients, create a link, delete a client. Requires the `x-admin-password` header. |
+| `lib/store.js` | Storage (Upstash Redis REST API; `MEMORY_STORE=1` for local testing). |
+| `tests/` | Local server and end-to-end browser tests. |
+| `claude-artifact/` | The earlier versions built as Claude artifact pages (onboarding interview and script interview). Not deployed. |
+| `skills/client-script-interview/SKILL.md` | The Claude skill for script interviews. Not deployed. |
 
-## How the pages run
-
-Both pages are written for Claude's artifact runtime (`window.claude.use(...)`):
-
-- `onboarding.html` uses the artifact database (`db`) to save each client's answers under `submissions/<their id>`, `user` to tell the owner from clients and show client names, and `downloads` for the copy/download fallback. Access rules published with it:
-  - `submissions`: read and write by the owner only
-  - `submissions/{self}`: each signed-in client reads and writes only their own answers
-- `script-interview.html` uses `sample` (Claude answers on the viewer's account), `artifact` (the owner edits and republishes the brief), `downloads`, and `user`.
-
-Opened outside Claude (for example straight from this repo), `onboarding.html` still works but keeps answers on the device only, and `script-interview.html` can show the brief but can't run the interviewer.
-
-## Sending the onboarding interview to a client
-
-1. Open the published page in Claude and use the Share menu.
-2. Add the client's email with **Editor** access so their answers save to you. They need a free Claude account.
-3. Send them the link. They only see their own interview.
-
-Clients with view-only access can still complete it; at the end they copy or download their answers and send them over.
-
-## Running the tests
-
-Requires Node and Playwright with Chromium.
+## Running locally
 
 ```bash
-npm install playwright
-npx playwright install chromium
-node tests/onboarding.test.js
+MEMORY_STORE=1 ADMIN_PASSWORD=test node tests/server.js
+# open http://localhost:3000/admin (password: test)
 ```
 
-The tests simulate the Claude runtime and cover: autosave while typing, navigation, resume on a new device, sending, the view-only fallback, the owner dashboard, and phone-width layout.
+## Tests
+
+Requires Node 18+ and Playwright with Chromium:
+
+```bash
+npm install --no-save playwright
+npx playwright install chromium
+node tests/site.test.js
+```
+
+The tests cover: dashboard sign-in, creating client links, invalid links, voice recording (simulated speech recognition), autosave, resuming on another device, sending, the dashboard's answer view and download, browsers without speech-to-text, a blocked microphone, the server being unreachable, the setup screens, and deleting a client.
